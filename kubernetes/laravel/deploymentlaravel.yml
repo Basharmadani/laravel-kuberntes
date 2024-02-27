@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment-laravel
+  labels:
+    app: laravel
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: laravel
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app: laravel
+    spec:
+      containers:
+        - name: laravel
+          image: mo1074/laravelkube
+          ports:
+            - containerPort: 80
+          env:
+            - name: DB_HOST
+              value: todo-mysql
+            - name: DB_PORT
+              value: "3306"
+            - name: DB_USERNAME
+              value: root
+            - name: DB_PASSWORD
+              valueFrom:
+                 secretKeyRef:
+                   name: mysqlpwd
+                   key: password
+            - name: DB_DATABASE
+              value: "todo_db"
+            - name: APP_ENV
+              value: "production"
+            - name: APP_DEBUG
+              value: "false"
+            - name: APP_KEY
+              value: base64:K/N42zIn102xviesgUkYDAt2suqvXSoqh739t5sVXF4=  
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "256m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            failureThreshold: 2
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            failureThreshold: 2
+      initContainers:
+        - name: init-mysql
+          image: mysql:latest
+          command: ['sh', '-c', 'until mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USERNAME" -p"$DB_PASSWORD" -e ";" ; do sleep 5; done;']
+          env:
+            - name: DB_HOST
+              value: todo-mysql
+            - name: DB_PORT
+              value: "3306"
+            - name: DB_USERNAME
+              value: root
+            - name: DB_PASSWORD
+              valueFrom:
+                 secretKeyRef:
+                   name: mysqlpwd
+                   key: password
+          securityContext:
+            privileged: false
